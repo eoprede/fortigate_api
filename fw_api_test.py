@@ -1,7 +1,6 @@
 import pprint
 import json
 import requests
-import time
 import getpass
 
 
