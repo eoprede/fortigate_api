@@ -24,7 +24,7 @@ class fortigate_api:
         return self
                 
     def __del__(self):
-        requests.post('https://'+self.ip+'/logout', verify=self.verify, proxies=self.proxies)
+        requests.post('https://'+self.ip+'/logout', cookies=self.cookies, verify=self.verify, proxies=self.proxies)
 
     def __exit__(self, *args):
         pass
