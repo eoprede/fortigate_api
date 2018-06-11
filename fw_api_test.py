@@ -1,19 +1,27 @@
+#!/usr/bin/env python
+
 import pprint
-import json
 import requests
 import getpass
 
 
 class fortigate_api:
 
-    def __init__(self, ip, un, pw, verify=False, proxies=None, disable_warnings=True):
+    _secure=True
+
+    def __init__(self, ip, un, pw, verify=False, proxies=None, disable_warnings=True, secure=True):
         if disable_warnings:
             requests.packages.urllib3.disable_warnings()
         unpw = {'username':un,'secretkey':pw}
+        self._secure=secure
         self.verify = verify
         self.ip = ip
         self.proxies=proxies
-        auth = requests.post('https://'+self.ip+'/logincheck', data=unpw, verify=self.verify, proxies=self.proxies)
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        auth = requests.post(http+self.ip+'/logincheck', data=unpw, verify=self.verify, proxies=self.proxies)
         self.cookies = auth.cookies
         for cookie in self.cookies:
             if cookie.name == "ccsrftoken":
@@ -22,9 +30,18 @@ class fortigate_api:
 
     def __enter__(self):
         return self
-                
+
     def __del__(self):
-        requests.post('https://'+self.ip+'/logout', cookies=self.cookies, verify=self.verify, proxies=self.proxies)
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        try:
+            requests.post(http+self.ip+'/logout', verify=self.verify, cookies=self.cookies, proxies=self.proxies)
+        except AttributeError:
+            print ("Looks like connection to "+self.ip+" has never been established")
+
+
 
     def __exit__(self, *args):
         pass
@@ -32,41 +49,58 @@ class fortigate_api:
     def get(self, path, api='v2', params=None):
         if isinstance(path, list):
             path = '/'.join(path) + '/'
-        return requests.get('https://'+self.ip+'/api/'+api+'/'+path, cookies=self.cookies, verify=self.verify, proxies=self.proxies, params=params)
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        return requests.get(http+self.ip+'/api/'+api+'/'+path, cookies=self.cookies, verify=self.verify, proxies=self.proxies, params=params)
 
     def put(self, path, api='v2', params=None, data=None):
         if isinstance(path, list):
             path = '/'.join(path) + '/'
-        return requests.put('https://'+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies, 
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        return requests.put(http+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies,
                             verify=self.verify, proxies=self.proxies, params=params, json={'json': data})
 
-    def post(self, path, api='v2', params=None, data=None):
+    def post(self, path, api='v2', params=None, data=None, files=None):
         if isinstance(path, list):
             path = '/'.join(path) + '/'
-        return requests.post('https://'+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies, 
-                            verify=self.verify, proxies=self.proxies, params=params, json={'json': data})
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        return requests.post(http+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies,
+                            verify=self.verify, proxies=self.proxies, params=params, json={'json': data},
+                            files=files)
 
     def delete(self, path, api='v2', params=None, data=None):
         if isinstance(path, list):
             path = '/'.join(path) + '/'
-        return requests.delete('https://'+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies, 
+        if self._secure:
+            http='https://'
+        else:
+            http='http://'
+        return requests.delete(http+self.ip+'/api/'+api+'/'+path, headers=self.header,cookies=self.cookies,
                             verify=self.verify, proxies=self.proxies, params=params, json={'json': data})
 
     def show(self, path, api='v2', params=None):
-        response = json.loads(self.get(path, api=api, params=params).content)
-        return response
+        response = self.get(path, api=api, params=params)
+        return response.json()
 
     def edit(self, path, api='v2', params=None, data=None):
-        response = json.loads(self.put(path, api=api, params=params, data=data).content)
-        return response
+        response = self.put(path, api=api, params=params, data=data)
+        return response.json()
 
-    def create(self, path, api='v2', params=None, data=None):
-        response = json.loads(self.post(path, api=api, params=params, data=data).content)
-        return response
+    def create(self, path, api='v2', params=None, data=None, files=None):
+        response = self.post(path, api=api, params=params, data=data, files=files)
+        return response.json()
 
     def remove(self, path, api='v2', params=None, data=None):
-        response = json.loads(self.delete(path, api=api, params=params, data=data).content)
-        return response
+        response = self.delete(path, api=api, params=params, data=data)
+        return response.json()
 
     @staticmethod
     def print_data(response, verbose=False):
@@ -84,21 +118,38 @@ class fortigate_api:
 
 
 def main():
-    
-    '''un = "admin"
+    un = "admin"
     pw = getpass.getpass()
+    #proxy={'http': 'socks5://127.0.0.1:9000'}
+    proxy = None
+
+    fw = '192.168.3.19'
+
+    intf = {
+              "name": "testagg",
+              "vdom": "root",
+              "allowaccess": "ping",
+              "ip": "1.1.1.1 255.255.255.0",
+              "role": "lan",
+              "type": "aggregate",
+              "member": [
+                {
+                    "interface-name": "port6"
+                },
+                {
+                    "interface-name": "port7"
+                }
+              ]
+            }
 
     try:
-        t = fortigate_api('1.2.3.4:10443', un, pw)
-        t.print_data (t.show(['cmdb', 'system', 'interface', 'port5']))
-        t.print_data (t.edit(['cmdb', 'system', 'interface', 'port5'], data={'ip': '1.1.1.1 255.255.255.255','status': 'down'}), verbose=True)
-        t.print_data (t.show(['cmdb', 'system', 'interface', 'port5']))
-        t.print_data (t.edit(['cmdb', 'report', 'setting'], params={'vdom':'WAN'}, data={'fortiview': 'disable','pdf-report': 'disable'}))
+        t = fortigate_api(fw, un, pw, proxies=proxy)
+        t.print_data (t.show('cmdb/system/interface'))
+        t.print_data (t.create('cmdb/system/interface', data=intf))
+
     except:
         print ('something went wrong')
-        raise'''
- 
-
+        raise
 
 if __name__ == "__main__":
     main()
