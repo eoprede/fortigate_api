@@ -69,6 +69,14 @@ policy = {"action": "accept",
 fw.create (['cmdb','firewall','policy'], data=policy)
 ```
 
+#### Move policy around
+By default, new policy is being placed at the end of the rules list. You can move it aroud as needed with the following code:
+```
+fw.edit(['cmdb', 'firewall', 'policy', '3'], params={"action": "move", "before": "1"})
+fw.edit(['cmdb', 'firewall', 'policy', '3'], params={"action": "move", "after": "1"})
+```
+Note that you are referencing policies by their ID and not their position in the list. The first example above does not guarantee that the rule will be placed 1st in the rule list, as policy with ID 1 can be located anywhere in the list.
+
 #### Working with VDOMs
 By default, you are working with VDOM root, but you can specify any other VDOM with params={'vdom':'WAN'}
 For example, previous API call with VDOM would look like this:
@@ -78,4 +86,3 @@ fw.create (['cmdb','firewall','policy'], params={'vdom':'WAN'}, data=policy)
 
 #### Known issues
 * Error checking is non-existent. For example, failed authentication would be raised as a JSON exception (as there would be nothing to decode from an API response, as there would be none)
-* I have not tested additional actions, like moving FW policies around. Theoretically it should be done with additional values in params, but I haven't tested it.
