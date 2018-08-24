@@ -2,6 +2,8 @@
 Main library to interface with the Fortigate API
 It's best to use it with Fortigates running code 5.4 and later, as 5.2 lacks lots of API calls.
 
+Consider taking a look at the [Ansible modules](https://github.com/eoprede/ansible_fortios_api) that are based on this library, as they provide lots of additional functionality for managing the Fortigate Firewalls.
+
 ### Usage:
 
 ##### Instantiate object
